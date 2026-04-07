@@ -24,14 +24,14 @@ class ClientThread extends Thread {
     public void run() {
         try {
             socket = new Socket(hostname, port);
-            System.out.println("Client " + clientId + " connected.");
+            System.out.println("Client#" + clientId + " connected.");
 
             Scanner reader = new Scanner(socket.getInputStream());
             writer = new PrintWriter(socket.getOutputStream(), true);
 
             while (reader.hasNextLine()) {
                 String response = reader.nextLine();
-                System.out.println("Server -> Client " + clientId + ": " + response);
+                System.out.println("Server -> Client#" + clientId + ": " + response);
             }
 
             reader.close();
@@ -41,13 +41,16 @@ class ClientThread extends Thread {
     }
 
     void sendMessage(String msg) {
-        if (this.isConnected()) {
+        if (isConnected()) {
             writer.println(msg);
 
             if (msg.equalsIgnoreCase("bye")) {
                 try {
                     writer.close();
                     socket.close();
+
+                    writer = null;
+                    socket = null;
                 } catch (IOException e) {
                     System.err.println("Error at ClientThread-" + threadId() + " : " + e.getMessage());
                 }
@@ -104,11 +107,16 @@ class Client {
                     input.nextLine();
 
                     if (id < 0 || id >= nextClientId) {
-                        System.err.println("Invalid client id.");
+                        System.err.println("Error: Invalid client id.");
                         break;
                     }
 
-                    System.out.print("Message as Client#" + id);
+                    if (!clients.get(id).isConnected()) {
+                        System.err.println("Error: Client not connected.");
+                        break;
+                    }
+
+                    System.out.print("Message as Client#" + id + ": ");
                     String line = input.nextLine();
                     clients.get(id).sendMessage(line);
                 }
@@ -117,7 +125,7 @@ class Client {
                     System.out.print("Active client IDs: ");
                     for (ClientThread client : clients) {
                         if (client.isConnected()) {
-                            System.out.print(client.getClientId());
+                            System.out.print(client.getClientId() + " ");
                         }
                     }
                     System.out.println();
@@ -128,9 +136,7 @@ class Client {
                     System.exit(0);
                 }
 
-                default -> {
-                    System.err.println("Invalid option.");
-                }
+                default -> System.err.println("Invalid option.");
             }
         }
     }

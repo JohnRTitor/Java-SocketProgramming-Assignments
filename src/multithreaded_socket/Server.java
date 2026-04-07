@@ -23,18 +23,18 @@ class ServerThread extends Thread {
 
             while (reader.hasNextLine()) {
                 String text = reader.nextLine();
-                System.out.println("Client #" + this.clientId + " says: " + text);
+                System.out.println("Client #" + clientId + " says: " + text);
 
                 if (text.equalsIgnoreCase("bye")) {
-                    writer.println("Termination request accepted from Client#" + this.clientId);
+                    writer.println("Termination request accepted from Client#" + clientId);
                     break;
                 } else {
-                    writer.println("Received message from Client#" + this.clientId);
+                    writer.println("Received message from Client#" + clientId);
                 }
             }
 
             socket.close();
-            System.out.println("Client #" + clientId + " disconnected from " + socket.getInetAddress() + ":" + socket.getPort());
+            System.out.println("Client#" + clientId + " disconnected from " + socket.getInetAddress() + ":" + socket.getPort());
         } catch (IOException e) {
             System.err.println("Error at ServerThread-" + threadId() + " : " + e.getMessage());
         }
