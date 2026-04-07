@@ -15,7 +15,7 @@ class Server {
             System.out.println("Waiting for client...");
 
             try (Socket socket = serverSocket.accept()) {
-                System.out.println("Client connected");
+                System.out.println("Client connected from: " + socket.getInetAddress() + ":" + socket.getPort());
 
                 Scanner reader = new Scanner(socket.getInputStream());
                 PrintWriter writer = new PrintWriter(socket.getOutputStream(), true); // true autoflushes

@@ -4,7 +4,7 @@ import java.util.Random;
 import java.util.Scanner;
 
 class MyThread extends Thread {
-    int runningTime;
+    private int runningTime;
 
     MyThread(int runningTime) {
         this.runningTime = runningTime;
