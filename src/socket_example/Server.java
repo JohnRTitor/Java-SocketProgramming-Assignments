@@ -1,52 +1,42 @@
 package socket_example;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.Iterator;
-import java.util.Set;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Scanner;
 
-public class Server {
-    public static void main(String[] args) throws IOException {
-        // Create Selector and ServerSocketChannel
-        Selector selector = Selector.open();
-        try (ServerSocketChannel serverSocket = ServerSocketChannel.open()) {
-            serverSocket.bind(new InetSocketAddress("localhost", 9999));
-            serverSocket.configureBlocking(false); // Make non-blocking
+class Server {
+    public static void main(String[] args) {
+        int port = 6000;
 
-            // Register server socket to accept connections
-            serverSocket.register(selector, SelectionKey.OP_ACCEPT);
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Server is listening on port " + port);
+            System.out.println("Waiting for client...");
 
-            while (true) {
-                selector.select(); // Block until events
-                Set<SelectionKey> selectedKeys = selector.selectedKeys();
-                Iterator<SelectionKey> iter = selectedKeys.iterator();
+            try (Socket socket = serverSocket.accept()) {
+                System.out.println("Client connected");
 
-                while (iter.hasNext()) {
-                    SelectionKey key = iter.next();
+                Scanner reader = new Scanner(socket.getInputStream());
+                PrintWriter writer = new PrintWriter(socket.getOutputStream(), true); // true autoflushes
 
-                    if (key.isAcceptable()) {
-                        // Accept new connection
-                        SocketChannel client = serverSocket.accept();
-                        client.configureBlocking(false);
-                        client.register(selector, SelectionKey.OP_READ);
-                        System.out.println("Client Connected");
+                while (reader.hasNextLine()) {
+                    String text = reader.nextLine();
+                    System.out.println("Client message: " + text);
+
+                    if (text.equalsIgnoreCase("bye")) {
+                        writer.println("Termination request accepted.");
+                        break;
+                    } else {
+                        writer.println("Received!");
                     }
-                    if (key.isReadable()) {
-                        // Read data
-                        SocketChannel client = (SocketChannel) key.channel();
-                        ByteBuffer buffer = ByteBuffer.allocate(256);
-                        client.read(buffer);
-                        System.out.println("Received: " + new String(buffer.array()).trim());
-                        // In real app, write back to client here
-                    }
-                    iter.remove();
                 }
+
+                reader.close();
+                writer.close();
             }
-        } catch ()
+        } catch (IOException e) {
+            System.err.println(e.getMessage());
+        }
     }
 }
