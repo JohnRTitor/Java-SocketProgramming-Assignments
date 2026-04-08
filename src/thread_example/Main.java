@@ -27,18 +27,14 @@ public class Main {
         System.out.print("How many threads to create? ");
         int nThreads = sc.nextInt();
 
-        MyThread[] threads = new MyThread[nThreads];
-
         // Now for each thread, choose a random running time between minSecs and maxSecs
         Random random = new Random();
-        int minSecs = 0;
-        int maxSecs = 10;
+        final int minSecs = 0;
+        final int maxSecs = 10;
 
         for (int i = 0; i < nThreads; i++) {
             int randomRunningTime = random.nextInt(maxSecs - minSecs + 1) + minSecs;
-            threads[i] = new MyThread(randomRunningTime);
-
-            threads[i].start();
+            (new MyThread(randomRunningTime)).start();
         }
 
         sc.close();

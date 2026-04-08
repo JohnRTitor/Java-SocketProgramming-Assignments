@@ -32,9 +32,9 @@ class ServerThread extends Thread {
                     writer.println("Received message from Client#" + clientId);
                 }
             }
-
-            socket.close();
+            
             System.out.println("Client#" + clientId + " disconnected from " + socket.getInetAddress() + ":" + socket.getPort());
+            socket.close();
         } catch (IOException e) {
             System.err.println("Error at ServerThread-" + threadId() + " : " + e.getMessage());
         }
@@ -43,14 +43,13 @@ class ServerThread extends Thread {
 }
 
 class Server {
-    static private int nextClientId = 0;
-
     public static void main(String[] args) {
         int port = 6000;
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Server is listening on port " + port);
 
+            int nextClientId = 0;
             while (true) {
                 // Waits for a new client here
                 Socket socket = serverSocket.accept();
