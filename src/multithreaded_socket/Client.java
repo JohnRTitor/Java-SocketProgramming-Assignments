@@ -85,9 +85,9 @@ class Client {
 
         while (true) {
             System.out.println("\n===== MENU =====");
-            System.out.println("1. Add new client");
-            System.out.println("2. Send message to a client");
-            System.out.println("3. List clients");
+            System.out.println("1. Add a new client");
+            System.out.println("2. Send message as a client");
+            System.out.println("3. List active clients");
             System.out.println("4. Exit");
             System.out.print("Choose option: ");
 
