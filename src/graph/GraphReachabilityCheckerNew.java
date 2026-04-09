@@ -2,25 +2,29 @@ int nVertices = 0;
 int[][] adj = new int[100][100];
 
 void readGraph(String filePath) {
-    try (Scanner file = new Scanner(new File(filePath))) {
-
+    try (var lines = Files.lines(Path.of(filePath))) {
         // in each line of the file: an edge (u, v) is stored like this:
         // 2 4
         // 4 3
-        while (file.hasNextInt()) {
-            int u = file.nextInt();
-            int v = file.nextInt();
+        lines.map(line -> line.trim().split("\\s+"))
+                .filter(parts -> parts.length == 2)
+                .forEach(parts -> {
+                    try {
+                        int u = Integer.parseInt(parts[0]);
+                        int v = Integer.parseInt(parts[1]);
 
-            // directed graph, so add edge from u to v
-            adj[u][v] = 1;
+                        // directed graph, so add edge from u to v
+                        adj[u][v] = 1;
+                        // vertices start from the number 0, so add 1 to max of u or v, ie
+                        // if (4, 5) is found, there must be 5 + 1 = 6 vertices (0, 1, 2, 3, 4, 5)
+                        nVertices = Math.max(nVertices, Math.max(u, v) + 1);
 
-            // vertices start from the number 0, so add 1 to max of u or v, ie
-            // if (4, 5) is found, there must be 5 + 1 = 6 vertices (0, 1, 2, 3, 4, 5)
-            nVertices = Math.max(nVertices, Math.max(u, v) + 1);
-        }
-
-    } catch (FileNotFoundException e) {
-        IO.println("File not found.");
+                    } catch (NumberFormatException e) {
+                        IO.println("Error: while reading an edge. Input given: " + parts[0] + " " + parts[1] + ". Discarding and continuing...");
+                    }
+                });
+    } catch (IOException e) {
+        IO.println("Error while reading the file: " + e.getMessage());
         System.exit(0);
     }
 }
