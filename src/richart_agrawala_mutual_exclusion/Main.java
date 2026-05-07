@@ -1,49 +1,33 @@
-package RicartAgrawala;
+package richart_agrawala_mutual_exclusion;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.Scanner;
 
 // Each process runs as a separate thread
 class Process extends Thread {
 
-    // Total number of processes in the system
     static int totalProcesses;
-
-    // Array to store all process objects
     static Process[] processes;
 
-    // Stores last printed queue to avoid duplicate printing
     static String lastQueue = "";
 
-    // Unique process ID
     int pid;
 
-    // Timestamp
     long requestTimestamp = 0;
 
-    // Flags to track process state
     boolean requestingCS = false;
     boolean inCriticalSection = false;
 
-    // Count of replies received from other processes
     int repliesReceived = 0;
 
-    // Stores which processes are waiting for reply (deferred)
     boolean[] deferredReplies;
 
-    // Random generator to simulate random CS requests
-    Random random = new Random();
-
-    // Constructor
     Process(int id) {
         this.pid = id;
 
-        // Initialize deferred reply array
         deferredReplies = new boolean[totalProcesses];
 
-        // Store process in global array
         processes[id] = this;
 
         System.out.println("Thread created with ID: " + pid);
@@ -51,43 +35,24 @@ class Process extends Thread {
 
     // Thread execution starts here
     public void run() {
-        try {
-            while (true) {
-
-                // Wait for some time before next action
-                Thread.sleep(1200);
-
-                // Randomly decide whether to request CS
-                if (random.nextBoolean()) {
-                    requestCS();
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        requestCS();
     }
 
     void requestCS() {
 
-        // If already requesting or inside CS, do nothing
         if (requestingCS || inCriticalSection) return;
 
-        // Get system timestamp
         requestTimestamp = System.currentTimeMillis();
 
-        // Mark that this process is requesting CS
         requestingCS = true;
 
-        // Reset reply counter
         repliesReceived = 0;
 
         System.out.println("\nProcess " + pid +
                 " wants to ENTER CS at time " + requestTimestamp);
 
-        // Print current request queue
         printQueue();
 
-        // Send request to all other processes
         for (int i = 0; i < totalProcesses; i++) {
             if (i != pid) {
                 sendRequest(processes[i]);
@@ -100,29 +65,21 @@ class Process extends Thread {
         System.out.println("Process " + pid +
                 " sending REQUEST (SMS) to " + other.pid);
 
-        // Call receiver's method
         other.receiveRequest(pid, requestTimestamp);
     }
 
     void receiveRequest(int senderId, long senderTime) {
         boolean sendReply;
 
-        // Case 1: If not requesting and not in CS, reply immediately
         if (!requestingCS && !inCriticalSection) {
             sendReply = true;
-        }
-
-        // Case 2: If currently inside CS, do not reply (defer)
-        else if (inCriticalSection) {
+        } else if (inCriticalSection) {
             sendReply = false;
 
             System.out.println("Process " + pid +
                     " is IN CS, " + senderId + " must WAIT");
-        }
+        } else {
 
-        // Case 3: If also requesting, compare timestamps
-        else {
-            // Priority based on smaller timestamp or smaller process ID
             if (senderTime < requestTimestamp ||
                     (senderTime == requestTimestamp && senderId < pid)) {
                 sendReply = true;
@@ -131,11 +88,9 @@ class Process extends Thread {
             }
         }
 
-        // If allowed, send reply
         if (sendReply) {
             sendReply(senderId);
         } else {
-            // Otherwise defer reply
             deferredReplies[senderId] = true;
         }
     }
@@ -144,19 +99,17 @@ class Process extends Thread {
         System.out.println("Process " + pid +
                 " REPLIED to " + receiverId);
 
-        // Send reply to receiver
         processes[receiverId].receiveReply(pid);
     }
 
     void receiveReply(int senderId) {
-        // Increase reply count
+
         repliesReceived++;
 
         System.out.println("Process " + pid +
                 " received REPLY from " + senderId +
                 " (" + repliesReceived + "/" + (totalProcesses - 1) + ")");
 
-        // If all replies received, enter CS
         if (repliesReceived == totalProcesses - 1) {
             enterCS();
         }
@@ -164,35 +117,29 @@ class Process extends Thread {
 
     void enterCS() {
 
-        // Mark that process entered CS
         inCriticalSection = true;
 
-        // Reset requesting flag
         requestingCS = false;
 
         System.out.println("\n>>> Process " + pid + " ENTER CS");
 
         try {
-            // Simulate execution inside CS
-            Thread.sleep(1000);
+            Thread.sleep(3000);
         } catch (Exception e) {
+            e.printStackTrace();
         }
 
-        // Exit CS after execution
         exitCS();
     }
 
     void exitCS() {
 
-        // Mark exit from CS
         inCriticalSection = false;
 
         System.out.println("<<< Process " + pid + " COMPLETED CS");
 
-        // Print updated queue
         printQueue();
 
-        // Send replies to all deferred processes
         for (int i = 0; i < totalProcesses; i++) {
             if (deferredReplies[i]) {
 
@@ -201,7 +148,6 @@ class Process extends Thread {
 
                 sendReply(i);
 
-                // Reset deferred flag
                 deferredReplies[i] = false;
             }
         }
@@ -209,10 +155,8 @@ class Process extends Thread {
 
     static void printQueue() {
 
-        // List to store requesting processes
         List<long[]> queue = new ArrayList<>();
 
-        // Collect all processes requesting CS
         for (int i = 0; i < totalProcesses; i++) {
             Process p = processes[i];
 
@@ -221,20 +165,18 @@ class Process extends Thread {
             }
         }
 
-        // Sort queue by timestamp, then process ID
         queue.sort((a, b) -> {
             if (a[1] == b[1]) return (int) (a[0] - b[0]);
             return Long.compare(a[1], b[1]);
         });
 
-        // Build queue string
         StringBuilder current = new StringBuilder();
+
         for (long[] q : queue) {
             current.append("[P").append(q[0])
                     .append(",T").append(q[1]).append("] ");
         }
 
-        // Print only if queue has changed
         if (!current.toString().equals(lastQueue)) {
             System.out.println("QUEUE: " + current);
             lastQueue = current.toString();
@@ -242,26 +184,61 @@ class Process extends Thread {
     }
 }
 
-public class RicartAgrawalaAlgorithm {
+class Main {
 
     public static void main(String[] args) {
 
         Scanner sc = new Scanner(System.in);
 
-        // Take input for number of processes
         System.out.print("Enter number of processes: ");
         int n = sc.nextInt();
 
-        // Initialize static variables
         Process.totalProcesses = n;
         Process.processes = new Process[n];
 
         Process[] all = new Process[n];
 
-        // Create and start all processes
         for (int i = 0; i < n; i++) {
             all[i] = new Process(i);
-            all[i].start();
         }
+
+        List<Integer> criticalSectionRequestors = new ArrayList<>();
+
+        System.out.println(
+                "Which processes should request CS? (0 - " +
+                        (n - 1) + ") -1 to stop input"
+        );
+
+        while (true) {
+
+            int processId = sc.nextInt();
+
+            if (processId == -1 &&
+                    criticalSectionRequestors.isEmpty()) {
+
+                System.out.println(
+                        "No process is requesting CS. Terminating..."
+                );
+
+                System.exit(0);
+            } else if (processId == -1) {
+                System.out.println("Continuing execution...");
+                break;
+            } else if (processId < 0 || processId >= n) {
+                System.out.println("Invalid process ID: " + processId);
+            } else if (criticalSectionRequestors.contains(processId)) {
+                System.out.println(
+                        processId + " is already requesting CS."
+                );
+            } else {
+                criticalSectionRequestors.add(processId);
+            }
+        }
+
+        for (int requestor : criticalSectionRequestors) {
+            all[requestor].start();
+        }
+
+        sc.close();
     }
 }
