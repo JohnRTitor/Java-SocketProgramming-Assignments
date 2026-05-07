@@ -1,179 +1,255 @@
 package raymond_mutual_exclusion;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Scanner;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 class Node extends Thread {
-    private int nodeId;
+    private final int nodeId;
     private Node parent = null;
-    private Queue<Node> requestQueue = new ConcurrentLinkedQueue<>();
 
+    // True only for current token holder
     private boolean hasToken = false;
+
+    // Protects queue + token state from concurrent access
+    // As multiple threads may simultaneously call receiveRequest(),
+    // receiveToken(), processQueue(), and these methods modify
+    // variables such as hasToken, parent, requestQueue, a lock is required
+    // Without locking: queue corruption may happen, multiple token transfers
+    // may occur, duplicate REQUEST forwarding may happen
+    private final ReentrantLock lock = new ReentrantLock();
+
+    // Prevents duplicate REQUEST forwarding
+    private boolean requestSentToParent = false;
+
+    // FIFO queue of pending token requests, LinkedList is actually a Queue
+    private final Queue<Node> requestQueue = new LinkedList<>();
 
     Node(int nodeId) {
         this.nodeId = nodeId;
     }
 
     void setParent(Node parent) {
-        // if null is provided as parent, then this node must be the root
-        // since the root can only hold token, set hasToken to true
-        if (parent == null) {
-            hasToken = true;
-            this.parent = null;
-        } else {
-            this.parent = parent;
-        }
+        this.parent = parent;
     }
 
-
-    void requestCS() {
-        // When requesting CS, first add itself to its own requestQueue
-        if (!requestQueue.contains(this)) {
-            requestQueue.add(this);
-        }
-
-        // Parent also receives the request
-        if (parent != null) {
-            parent.receiveRequest(this);
-        }
-
-        processQueue();
+    void setAsRoot() {
+        this.hasToken = true;
     }
 
     void receiveRequest(Node requester) {
-        if (!requestQueue.contains(requester)) {
+
+        Node forwardTo = null;
+
+        // By locking, we safely insert to the queue and modify state variables
+        lock.lock();
+        try {
             requestQueue.add(requester);
+
+            if (!hasToken && !requestSentToParent) {
+                requestSentToParent = true;
+                forwardTo = parent;
+            }
+
+        } finally {
+            // Finally unlock, so other threads can modify state variables
+            lock.unlock();
         }
 
-        // only forward the request to parent if this is not the root
-        if (parent != null) {
-            parent.receiveRequest(this);
+        // Forward request outside lock to avoid deadlock, recieveRequest() can
+        // handle locking on its own
+        if (forwardTo != null) {
+            System.out.println("Node " + nodeId + " forwarding REQUEST to " + forwardTo.nodeId);
+            forwardTo.receiveRequest(this);
         }
 
         processQueue();
     }
 
+    void receiveToken(Node from) {
+        // By locking, we safely update state variables and token ownership
+        lock.lock();
+        try {
+            setAsRoot();
+            parent = from;
+            requestSentToParent = false;
+        } finally {
+            // Finally unlock, so other threads can modify state variables
+            lock.unlock();
+        }
+
+        System.out.println("Node " + nodeId + " received TOKEN from " + from.nodeId);
+        processQueue();
+    }
 
     void processQueue() {
-        if (!hasToken) return;
+        while (true) {
+            Node next = null;
+            Node forwardRequestTo = null;
 
-        if (!requestQueue.isEmpty()) {
-            // The next node to receive the token
-            Node nextInLine = requestQueue.poll();
-            
-            if (nextInLine == null) {
-                return;
-            }
+            // By locking, we safely insert to the queue and modify state variables
+            lock.lock();
+            try {
+                if (!hasToken || requestQueue.isEmpty()) {
+                    return;
+                }
 
-            if (nextInLine == this) {
-                enterCS();
-            } else {
-                // Relinquish the token and pass it to nextInLine
-                hasToken = false;
-                nextInLine.hasToken = true;
+                // Dequeue from the queue
+                next = requestQueue.poll();
 
-                // reverse the edge, so nextInLine becomes the parent
-                // and nextInLine becomes root
-                this.parent = nextInLine;
-                nextInLine.parent = null;
+                if (next != this) {
+                    hasToken = false;
+                    parent = next;
 
-                // Transfer remaining queue entries to nextInLine
-                while (!requestQueue.isEmpty()) {
-                    Node pendingRequest = requestQueue.poll();
-
-                    if (!nextInLine.requestQueue.contains(pendingRequest)) {
-                        nextInLine.requestQueue.add(pendingRequest);
+                    if (!requestQueue.isEmpty()) {
+                        requestSentToParent = true;
+                        forwardRequestTo = next;
                     }
                 }
 
+            } finally {
+                // Finally unlock, so other threads can modify state variables
+                lock.unlock();
+            }
 
-                System.out.println("Token passed from " + nodeId + " to " + nextInLine.nodeId);
-                nextInLine.processQueue();
+            if (next == this) {
+                enterCS();
+            } else {
+                // Forward request outside lock to avoid deadlock, recieveRequest() can
+                // handle locking on its own
+                if (forwardRequestTo != null) {
+                    System.out.println("Node " + nodeId + " forwarding pending REQUEST to " + forwardRequestTo.nodeId);
+
+                    forwardRequestTo.receiveRequest(this);
+                }
+
+                // Pass token outside lock for the same reason, recieveToken() can
+                // handle locking on its own
+                System.out.println("Node " + nodeId + " passing TOKEN to " + next.nodeId);
+
+                next.receiveToken(this);
+
+                return;
             }
         }
     }
 
-    void enterCS() {
+    private void enterCS() {
+        System.out.println(">>> Node " + nodeId + " ENTERING CS");
 
-        System.out.println("Node " + getNodeId() + " ENTERING CS");
         try {
-            sleep(5000);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
-            System.err.println("Something went wrong: " + e.getMessage());
+            System.err.println("Error: Node " + nodeId + " interrupted during execution.");
             System.exit(1);
         }
 
-        System.out.println("Node" + getNodeId() + " HAS EXITED CS");
-
-        processQueue();
+        System.out.println("<<< Node " + nodeId + " EXITING CS");
     }
 
     @Override
     public void run() {
-        requestCS();
-    }
 
-    int getNodeId() {
-        return nodeId;
+        System.out.println("Node " + nodeId + " requesting CS");
+
+        receiveRequest(this);
     }
 }
 
 class Main {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
-        System.out.print("How many threads? ");
-        int nThreads = sc.nextInt();
-        if (nThreads < 2) {
-            System.out.println("At least 2 threads is required.");
-            System.exit(0);
+
+        System.out.print("How many nodes? ");
+        int n = sc.nextInt();
+
+        if (n < 2) {
+            System.out.println("At least 2 nodes required.");
+            return;
         }
 
-        Node[] tree = new Node[nThreads];
-        for (int i = 0; i < nThreads; i++) {
+        Node[] tree = new Node[n];
+
+        for (int i = 0; i < n; i++) {
             tree[i] = new Node(i);
         }
 
-        System.out.println("Enter parent id for each node: (type -1 for root node)");
-        for (int i = 0; i < nThreads; i++) {
-            System.out.print(i + ": ");
+        // Don't allow multiple roots or no root, this must be equal to 1 after all input
+        int rootCount = 0;
+
+        System.out.println("Enter parent id for each node (-1 for root/token holder):");
+
+        for (int i = 0; i < n; i++) {
+
+            System.out.print("Parent of node " + i + ": ");
             int parentId = sc.nextInt();
-            if (parentId == -1) { // if -1, then it's the root
-                tree[i].setParent(null);
-            } else if (parentId > nThreads - 1 || parentId < 0) {
-                System.out.println("Invalid threadId for parent: " + parentId);
+
+            if (parentId == -1) {
+                rootCount++;
+
+                if (rootCount > 1) {
+                    System.out.println("Only one root allowed. Try again.");
+
+                    i--;
+                    rootCount--;
+                    continue;
+                }
+
+                tree[i].setAsRoot();
+            } else if (parentId < 0 || parentId >= n) {
+                System.out.println("Invalid parent id. Try again.");
                 i--;
             } else {
                 tree[i].setParent(tree[parentId]);
             }
         }
 
-        List<Integer> criticalSectionRequestors = new ArrayList<>();
+        if (rootCount == 0) {
+            System.out.println("No root defined. Exiting.");
+            System.exit(0);
+        }
 
-        System.out.println("Which threads should request CS? (0 - " + (nThreads - 1) + ") -1 to stop input");
+        List<Integer> requestors = new ArrayList<>();
+
+        System.out.println("Which nodes should request CS? Enter ids one by one, -1 to stop:");
+
         while (true) {
-            int threadId = sc.nextInt();
-            if (threadId == -1 && criticalSectionRequestors.isEmpty()) {
-                System.out.println("No thread is requesting CS. Terminating...");
-                System.exit(0);
-            } else if (threadId == -1) {
-                System.out.println("Continuing execution...");
+            int id = sc.nextInt();
+
+            if (id == -1) {
                 break;
-            } else if (threadId > nThreads - 1 || threadId < 0) {
-                System.out.println("Invalid threadId: " + threadId);
-            } else if (criticalSectionRequestors.contains(threadId)) {
-                System.out.println(threadId + " already is requesting CS.");
+            }
+
+            if (id < 0 || id >= n) {
+                System.out.println("Invalid node id.");
+            } else if (requestors.contains(id)) {
+                System.out.println("Node " + id + " already added.");
             } else {
-                criticalSectionRequestors.add(threadId);
+                requestors.add(id);
             }
         }
 
-        for (int requestor : criticalSectionRequestors) {
-            tree[requestor].start();
+        sc.close();
+
+        if (requestors.isEmpty()) {
+            System.out.println("No requestors. Exiting.");
+            return;
         }
 
-        sc.close();
+        // Start all requesting nodes concurrently
+        for (int id : requestors) {
+            tree[id].start();
+        }
+
+        // Wait for all CS requester threads to finish
+        for (int id : requestors) {
+            try {
+                tree[id].join();
+            } catch (InterruptedException e) {
+                System.err.println("Error: Node " + id + " interrupted during execution.");
+                System.exit(1);
+            }
+        }
+
+        System.out.println("All nodes have completed CS.");
     }
 }
