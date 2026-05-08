@@ -144,6 +144,9 @@ class Node extends Thread {
         }
 
         System.out.println("<<< Node " + nodeId + " EXITING CS");
+
+        printSystemState(Main.tree,
+                "STATE AFTER NODE " + nodeId + " COMPLETED CS");
     }
 
     @Override
@@ -153,9 +156,84 @@ class Node extends Thread {
 
         receiveRequest(this);
     }
+
+    static void printTreeState(Node[] tree) {
+        System.out.println("\nParent Structure:");
+
+        for (Node node : tree) {
+            int parentId = node.getParentId();
+
+            System.out.println(
+                    "Node " + node.nodeId + " : Parent -> " + (parentId == -1 ? "NULL" : parentId)
+            );
+        }
+    }
+
+    static void printTokenHolder(Node[] tree) {
+        System.out.println("\nCurrent Token Holder:");
+
+        for (Node node : tree) {
+            if (node.hasToken) {
+                System.out.println("Node " + node.nodeId + " holds TOKEN");
+                return;
+            }
+        }
+
+        System.out.println("No token holder found.");
+    }
+
+    static void printRequestQueues(Node[] tree) {
+        System.out.println("\nRequest Queues:");
+
+        for (Node node : tree) {
+            System.out.println(
+                    "Node " + node.nodeId + " queue -> " + node.getQueueString()
+            );
+        }
+    }
+
+    static void printSystemState(Node[] tree, String stage) {
+        System.out.println("\n=================================");
+        System.out.println(stage);
+        System.out.println("=================================");
+
+        printTreeState(tree);
+        printTokenHolder(tree);
+        printRequestQueues(tree);
+
+        System.out.println("=================================\n");
+    }
+
+    int getParentId() {
+        return parent == null ? -1 : parent.nodeId;
+    }
+
+    String getQueueString() {
+        lock.lock();
+
+        try {
+            if (requestQueue.isEmpty()) {
+                return "[]";
+            }
+
+            // Convert the queue of node objects into array of nodeIds for printing
+            List<Integer> ids = new ArrayList<>();
+
+            for (Node node : requestQueue) {
+                ids.add(node.nodeId);
+            }
+
+            return ids.toString();
+
+        } finally {
+            lock.unlock();
+        }
+    }
 }
 
 class Main {
+    static Node[] tree;
+
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
 
@@ -167,7 +245,7 @@ class Main {
             return;
         }
 
-        Node[] tree = new Node[n];
+        tree = new Node[n];
 
         for (int i = 0; i < n; i++) {
             tree[i] = new Node(i);
@@ -234,6 +312,8 @@ class Main {
             System.out.println("No requestors. Exiting.");
             return;
         }
+
+        Node.printSystemState(tree, "INITIAL STATE");
 
         // Start all requesting nodes concurrently
         for (int id : requestors) {
