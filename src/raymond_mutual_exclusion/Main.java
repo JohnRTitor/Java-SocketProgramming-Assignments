@@ -34,6 +34,7 @@ class Node extends Thread {
 
     void setAsRoot() {
         this.hasToken = true;
+        this.parent = null;
     }
 
     void receiveRequest(Node requester) {
@@ -70,7 +71,6 @@ class Node extends Thread {
         lock.lock();
         try {
             setAsRoot();
-            parent = from;
             requestSentToParent = false;
         } finally {
             // Finally unlock, so other threads can modify state variables
@@ -258,7 +258,7 @@ class Main {
 
         for (int i = 0; i < n; i++) {
 
-            System.out.print("Parent of node " + i + ": ");
+            System.out.print(i + ": ");
             int parentId = sc.nextInt();
 
             if (parentId == -1) {
