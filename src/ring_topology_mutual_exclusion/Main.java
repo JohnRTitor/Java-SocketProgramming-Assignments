@@ -12,24 +12,24 @@ class Node extends Thread {
     // Protects queue + token state from concurrent access.
     // Multiple threads may simultaneously call receiveRequest(), receiveToken(),
     // processQueue(), all of which modify hasToken, requestQueue, etc.
-    // Without locking: queue corruption, multiple token transfers, or duplicate
-    // TR forwarding may occur.
+    // Without locking, queue corruption, multiple token transfers, or duplicate
+    // TR forwarding may occur
     private final ReentrantLock lock = new ReentrantLock();
 
-    // Global lock representing the actual shared resource / critical section.
-    // If this algorithm works correctly, only one thread should ever acquire it at a time.
+    // Global lock representing the actual shared resource / critical section
+    // If this algorithm works correctly, only one thread should ever acquire it at a time
     static final ReentrantLock csLock = new ReentrantLock();
 
-    // Lets other nodes or itself know if it's currently in CS.
-    // Required to prevent concurrent actions such as token passing while in CS.
+    // Lets other nodes or itself know if it's currently in CS
+    // Required to prevent concurrent actions such as token passing while in CS
     private boolean inCS = false;
 
     // Whether this node currently holds the token
     private boolean hasToken = false;
 
-    // FIFO queue of pending CS requestor IDs.
-    // In ring topology the queue travels WITH the token as part of <TKN, E, Q>.
-    // Phold owns and manages the queue; when passing the token it hands Q along.
+    // FIFO queue of pending CS requestor IDs
+    // In ring topology the queue travels WITH the token as part of <TKN, E, Q>
+    // Phold owns and manages the queue; when passing the token it hands Q along
     private final Queue<Integer> requestQueue = new LinkedList<>();
 
     Node(int nodeId) {
@@ -45,11 +45,10 @@ class Node extends Thread {
     }
 
     // Called when this node receives a token request <TR, requesterId>.
-    // If this node is Phold (hasToken == true) it enqueues the requesterId and
-    // will serve it (even if currently in CS — processQueue fires after CS exits).
-    // Otherwise the TR is forwarded one hop around the ring toward Phold.
-    // Since the ring is a closed loop and Phold is always exactly one node,
-    // every TR is guaranteed to terminate at Phold within at most N-1 hops.
+    // If this node is Phold (hasToken == true) it enqueues the requesterId
+    // and adds the TR to the queue. Otherwise, the TR is forwarded one hop
+    // around the ring toward Phold. Every TR is guaranteed to terminate
+    // at Phold within at most N-1 hops.
     void receiveRequest(int requesterId) {
         // Walk the ring until we land on Phold
         Node current = this;
@@ -75,8 +74,8 @@ class Node extends Thread {
     }
 
     // Called when this node receives the token <TKN, targetId, Q>.
-    // If this node is the intended recipient (targetId == nodeId) it becomes the new Phold.
-    // Otherwise it forwards the token onward around the ring.
+    // If this node is the intended recipient (targetId == nodeId) it becomes the new Phold
+    // Otherwise it forwards the token onward around the ring
     void receiveToken(int targetId, Queue<Integer> q) {
         Node current = this;
         while (true) {
@@ -118,20 +117,16 @@ class Node extends Thread {
                     return;
                 }
 
-                // Peek instead of poll:
-                // the requester remains inside the travelling queue while the token
-                // is moving toward it.
+                // Peek inside the queue to find the next requester
                 next = requestQueue.peek();
 
                 if (next == nodeId) {
-                    // Token reached the requester at front of queue.
-                    // Remove self and enter CS.
+                    // Token reached the requester at front of queue
+                    // Remove it/self and enter CS
                     requestQueue.poll();
 
                     inCS = true;
                 }
-                // If next != nodeId we will pass the token; mark hasToken = false below
-                // outside the lock to avoid deadlock inside receiveToken()
             } finally {
                 lock.unlock();
             }
@@ -198,9 +193,14 @@ class Node extends Thread {
             printSystemState(Main.ring,
                     "STATE AFTER NODE " + nodeId + " COMPLETED CS");
         } catch (InterruptedException e) {
+
+            // Clear interrupted flag, allowing this thread to run again
             Thread.currentThread().interrupt();
             System.err.println("Error: Node " + nodeId + " interrupted during CS.");
         } finally {
+
+            // Always release the CS lock after execution
+            // even if an exception occurs
             csLock.unlock();
         }
     }
@@ -222,25 +222,21 @@ class Node extends Thread {
 
 
     static void printTokenHolder(Node[] ring) {
-        System.out.println("\nCurrent Token Holder:");
         for (Node node : ring) {
             if (node.hasToken) {
-                System.out.println("Node " + node.nodeId + " holds TOKEN");
+                System.out.println("\nCurrent Token Holder: Node " + node.nodeId);
                 return;
             }
         }
-        System.out.println("Token is in transit.");
     }
 
-    static void printRequestQueues(Node[] ring) {
-        System.out.println("\nRequest Queue (at Phold):");
+    static void printPholdRequestQueue(Node[] ring) {
         for (Node node : ring) {
             if (node.hasToken) {
-                System.out.println("Node " + node.nodeId + " queue -> " + node.getQueueString());
+                System.out.println("\nNode " + node.nodeId + " (Phold) queue -> " + node.getQueueString());
                 return;
             }
         }
-        System.out.println("(Token in transit — queue travelling with it)");
     }
 
     static void printSystemState(Node[] ring, String stage) {
@@ -248,7 +244,7 @@ class Node extends Thread {
         System.out.println(stage);
         System.out.println("=================================");
         printTokenHolder(ring);
-        printRequestQueues(ring);
+        printPholdRequestQueue(ring);
         System.out.println("=================================\n");
     }
 
@@ -298,7 +294,8 @@ class Main {
             ring[i] = new Node(i);
         }
 
-        // Wire the ring: each node's next neighbor is (i+1) % n
+        // Create ring structure, a circular linked list
+        // each node's next neighbor is (i+1) % n
         for (int i = 0; i < n; i++) {
             ring[i].setNextNeighbor(ring[(i + 1) % n]);
         }
@@ -348,6 +345,8 @@ class Main {
             try {
                 ring[id].join();
             } catch (InterruptedException e) {
+
+                // Clear interrupted flag, allowing this thread to run again
                 Thread.currentThread().interrupt();
                 System.err.println("Error: Node " + id + " interrupted.");
             }
