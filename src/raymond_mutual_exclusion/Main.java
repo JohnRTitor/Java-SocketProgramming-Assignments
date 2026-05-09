@@ -46,44 +46,41 @@ class Node extends Thread {
     }
 
     void receiveRequest(Node requester) {
+        Node current = this; // node whose queue we are adding to
+        Node toEnqueue = requester; // what goes into that queue
 
-        Node forwardTo = null;
+        while (current != null) {
+            Node nextNode = null; // next hop in the chain, null means we reached root
 
-        // By locking, we safely insert to the queue and modify state variables
-        lock.lock();
-        try {
-            requestQueue.add(requester);
+            // By locking, we safely add to queue, and update state variables
+            current.lock.lock();
+            try {
+                current.requestQueue.add(toEnqueue);
 
-            // If node does not currently hold token, and if request has not already
-            // been forwarded, forward REQUEST toward token holder, by routing through
-            // parent node, this is executed recursively, so it ultimately reaches
-            // current token holder (the root node)
-            if (!hasToken() && !requestSentToParent) {
-
-                // Mark that upward request has already been sent
-                // to avoid duplicate forwarding
-                requestSentToParent = true;
-
-                // Current parent points toward token holder,
-                // so REQUEST is forwarded there
-                forwardTo = parent;
+                // If current node has no token and hasn't already forwarded a
+                // request upward, forward now
+                if (!current.hasToken() && !current.requestSentToParent) {
+                    current.requestSentToParent = true;
+                    nextNode = current.parent; // walk one step up
+                }
+            } finally {
+                // Finally unlock, so other threads can modify state variables
+                current.lock.unlock();
             }
 
-        } finally {
-            // Finally unlock, so other threads can modify state variables
-            lock.unlock();
+            if (nextNode != null) {
+                System.out.println("Node " + current.nodeId +
+                        " forwarding REQUEST to " + nextNode.nodeId);
+            }
+
+            // processQueue for the node we just enqueued into. If this node already
+            // holds the token, it can handle the request immediately
+            current.processQueue();
+
+            // Advance loop: next iteration acts as nextNode.receiveRequest(current)
+            toEnqueue = current;
+            current = nextNode;
         }
-
-        // Perform recursive forwarding outside lock since
-        // receiveRequest() itself acquires locks
-        if (forwardTo != null) {
-            System.out.println("Node " + nodeId +
-                    " forwarding REQUEST to " + forwardTo.nodeId);
-
-            forwardTo.receiveRequest(this);
-        }
-
-        processQueue();
     }
 
     void receiveToken(Node from) {
