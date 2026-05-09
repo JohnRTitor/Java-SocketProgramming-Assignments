@@ -154,8 +154,9 @@ class Node extends Thread {
             printSystemState(Main.tree,
                     "STATE AFTER NODE " + nodeId + " COMPLETED CS");
         } catch (InterruptedException e) {
+            // Clear interrupted flag, allowing this thread to run again
+            Thread.currentThread().interrupt();
             System.err.println("Error: Node " + nodeId + " interrupted during execution.");
-            System.exit(1);
         } finally {
             // Always release the CS lock after execution
             // finally ensures unlock happens even if an exception occurs
@@ -339,8 +340,9 @@ class Main {
             try {
                 tree[id].join();
             } catch (InterruptedException e) {
+                // Clear interrupted flag, allowing this thread to run again
+                Thread.currentThread().interrupt();
                 System.err.println("Error: Node " + id + " interrupted during execution.");
-                System.exit(1);
             }
         }
 
