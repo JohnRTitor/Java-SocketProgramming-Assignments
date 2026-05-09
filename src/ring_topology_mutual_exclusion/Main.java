@@ -51,75 +51,59 @@ class Node extends Thread {
     // Since the ring is a closed loop and Phold is always exactly one node,
     // every TR is guaranteed to terminate at Phold within at most N-1 hops.
     void receiveRequest(int requesterId) {
-        Node forwardTo = null;
-        boolean isPhold = false;
-
-        lock.lock();
-        try {
-            if (hasToken) {
-                // This is Phold — enqueue the requester.
-                // processQueue() will serve it once this node exits CS (if in CS).
-                System.out.println("Node " + nodeId
-                        + " (Phold) enqueued TR from Node " + requesterId);
-                requestQueue.add(requesterId);
-                isPhold = true;
-            } else {
-                // Not the token holder; forward TR one hop around the ring toward Phold
-                forwardTo = nextNeighbor;
+        // Walk the ring until we land on Phold
+        Node current = this;
+        while (true) {
+            current.lock.lock();
+            try {
+                if (current.hasToken) {
+                    // Found Phold — enqueue and exit loop process
+                    System.out.println("Node " + current.nodeId
+                            + " (Phold) enqueued TR from Node " + requesterId);
+                    current.requestQueue.add(requesterId);
+                    break;
+                }
+            } finally {
+                current.lock.unlock();
             }
-        } finally {
-            lock.unlock();
+            // Not Phold — advance one hop
+            current = current.nextNeighbor;
         }
 
-        if (forwardTo != null) {
-//            System.out.println("Node " + nodeId
-//                    + " forwarding <TR, " + requesterId + "> to Node " + forwardTo.nodeId);
-            forwardTo.receiveRequest(requesterId);
-        }
-
-        if (isPhold) {
-            processQueue();
-        }
+        // At this point, current is Phold. Process the queue
+        current.processQueue();
     }
 
     // Called when this node receives the token <TKN, targetId, Q>.
     // If this node is the intended recipient (targetId == nodeId) it becomes the new Phold.
     // Otherwise it forwards the token onward around the ring.
     void receiveToken(int targetId, Queue<Integer> q) {
-        Node forwardTo = null;
-        boolean isTarget = false;
+        Node current = this;
+        while (true) {
+            current.lock.lock();
+            try {
+                if (current.nodeId == targetId) {
+                    // This node is the intended new Phold
+                    current.hasToken = true;
 
-        lock.lock();
-        try {
-            if (targetId == nodeId) {
-                // This node is the intended new Phold
-                hasToken = true;
-
-                // Absorb the queue that travels with the token
-                requestQueue.addAll(q);
-
-                System.out.println("Node " + nodeId
-                        + " received TOKEN <TKN, " + targetId + ", " + q + "> — now Phold");
-
-                isTarget = true;
-            } else {
-                // Not the target; forward the token to the next neighbor
-                forwardTo = nextNeighbor;
+                    // Absorb the queue that travels with the token
+                    current.requestQueue.addAll(q);
+                    System.out.println("Node " + current.nodeId
+                            + " received TOKEN <TKN, " + targetId + ", " + q
+                            + "> — now Phold");
+                    break;
+                } else {
+//                    System.out.println("Node " + nodeId
+//                            + " forwarding <TKN, " + targetId + ", " + q + "> to Node " + current.nextNeighbor.nodeId);
+                }
+            } finally {
+                current.lock.unlock();
             }
-        } finally {
-            lock.unlock();
+            current = current.nextNeighbor;
         }
-
-        if (forwardTo != null) {
-//            System.out.println("Node " + nodeId
-//                    + " forwarding <TKN, " + targetId + ", " + q + "> to Node " + forwardTo.nodeId);
-            forwardTo.receiveToken(targetId, q);
-        }
-
-        if (isTarget) {
-            processQueue();
-        }
+        current.processQueue();
     }
+
 
     // Phold processes the request queue after entering/exiting CS or receiving the token.
     // Keeps serving the next requester until the queue is empty, the token is passed,
@@ -130,12 +114,7 @@ class Node extends Thread {
 
             lock.lock();
             try {
-                if (inCS || !hasToken) {
-                    return;
-                }
-
-                // No pending requests
-                if (requestQueue.isEmpty()) {
+                if (inCS || !hasToken || requestQueue.isEmpty()) {
                     return;
                 }
 
@@ -167,18 +146,16 @@ class Node extends Thread {
                     lock.unlock();
                 }
 
-                // Continue the loop — maybe more requests are queued for others
             } else {
-                // Pass token <TKN, next, remainingQueue> to the ring neighbor
-                Queue<Integer> remainingQueue;
+                // Pass token <TKN, next, queueSnapshot> to the ring neighbor
+                Queue<Integer> queueSnapshot;
 
                 lock.lock();
                 try {
                     hasToken = false;
 
-                    // Snapshot the FULL queue to travel with the token.
-                    // Important: do NOT remove the target requester here.
-                    remainingQueue = new LinkedList<>(requestQueue);
+                    // Snapshot the FULL queue, along with the next token recipient
+                    queueSnapshot = new LinkedList<>(requestQueue);
 
                     requestQueue.clear();
                 } finally {
@@ -189,10 +166,11 @@ class Node extends Thread {
 //                        "STATE BEFORE PASSING TOKEN TO Node " + next);
 
                 System.out.println("Node " + nodeId
-                        + " passing <TKN, " + next + ", " + remainingQueue + "> to Node "
+                        + " passing <TKN, " + next + ", " + queueSnapshot + "> to Node "
                         + nextNeighbor.nodeId);
 
-                nextNeighbor.receiveToken(next, remainingQueue);
+                // Pass token to the next neighbor, along with the queue snapshot
+                nextNeighbor.receiveToken(next, queueSnapshot);
 
                 // Token has been passed; stop processing
                 return;
@@ -201,9 +179,9 @@ class Node extends Thread {
     }
 
     private void enterCS() {
-        // This lock simulates actual shared resource access.
-        // Only one node should EVER successfully acquire it.
-        // If tryLock() fails, the algorithm has violated mutual exclusion.
+        // This lock simulates actual shared resource access
+        // Only one node should EVER successfully acquire it
+        // If tryLock() fails, the algorithm has violated mutual exclusion
         if (!csLock.tryLock()) {
             System.out.println("Mutual exclusion VIOLATED while trying to enter CS at Node " + nodeId + "!");
             return;
@@ -231,7 +209,7 @@ class Node extends Thread {
     // neighbor. The TR travels around the ring until it reaches Phold, which
     // enqueues it. If Phold is this node itself, the TR goes one full loop
     // before arriving back — but in practice we handle this by also letting
-    // Phold enqueue its own request directly (see special case below).
+    // Phold enqueue its own request directly
     @Override
     public void run() {
         System.out.println("Node " + nodeId + " requesting CS");
