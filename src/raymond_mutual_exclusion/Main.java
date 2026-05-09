@@ -5,6 +5,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 class Node extends Thread {
     private final int nodeId;
+    // parent of the node in the inverted tree structure, initially null, but
+    // should be set, as only root of the tree has no parent
     private Node parent = null;
 
     // Protects queue + token state from concurrent access
@@ -43,10 +45,6 @@ class Node extends Thread {
         this.parent = null;
     }
 
-    boolean hasToken() {
-        return parent == null;
-    }
-
     void receiveRequest(Node requester) {
 
         Node forwardTo = null;
@@ -56,8 +54,18 @@ class Node extends Thread {
         try {
             requestQueue.add(requester);
 
+            // If node does not currently hold token, and if request has not already
+            // been forwarded, forward REQUEST toward token holder, by routing through
+            // parent node, this is executed recursively, so it ultimately reaches
+            // current token holder (the root node)
             if (!hasToken() && !requestSentToParent) {
+
+                // Mark that upward request has already been sent
+                // to avoid duplicate forwarding
                 requestSentToParent = true;
+
+                // Current parent points toward token holder,
+                // so REQUEST is forwarded there
                 forwardTo = parent;
             }
 
@@ -66,10 +74,12 @@ class Node extends Thread {
             lock.unlock();
         }
 
-        // Forward request outside lock to avoid deadlock, recieveRequest() can
-        // handle locking on its own
+        // Perform recursive forwarding outside lock since
+        // receiveRequest() itself acquires locks
         if (forwardTo != null) {
-            System.out.println("Node " + nodeId + " forwarding REQUEST to " + forwardTo.nodeId);
+            System.out.println("Node " + nodeId +
+                    " forwarding REQUEST to " + forwardTo.nodeId);
+
             forwardTo.receiveRequest(this);
         }
 
@@ -92,6 +102,10 @@ class Node extends Thread {
     }
 
     void processQueue() {
+        // Keep processing requests in the queue until:
+        // - queue becomes empty
+        // - token is passed away
+        // - node enters CS
         while (true) {
             Node next = null;
             Node forwardRequestTo = null;
@@ -103,17 +117,28 @@ class Node extends Thread {
                     return;
                 }
 
-                // Dequeue from the queue
+                // FIFO dequeue, it becomes next node to receive token
                 next = requestQueue.poll();
 
+                // If another node requested token, pass token ownership to that node
                 if (next != this) {
+                    // Parent now points to new token holder
+                    // meaning THIS node no longer owns token
                     parent = next;
 
                     if (!requestQueue.isEmpty()) {
+
+                        // Prevent duplicate forwarding
                         requestSentToParent = true;
+
+                        // Remaining requests must now be routed through
+                        // the new token holder
                         forwardRequestTo = next;
                     }
                 } else {
+
+                    // If next requester is itself,
+                    // this node may enter critical section
                     inCS = true;
                 }
 
@@ -125,6 +150,8 @@ class Node extends Thread {
             if (next == this) {
                 enterCS();
 
+                // Reset CS state after CS execution is completed
+                // By locking we safely update this variable
                 lock.lock();
                 try {
                     inCS = false;
@@ -132,6 +159,7 @@ class Node extends Thread {
                     lock.unlock();
                 }
             } else {
+
                 // Forward request outside lock to avoid deadlock, recieveRequest() can
                 // handle locking on its own
                 if (forwardRequestTo != null) {
@@ -146,15 +174,16 @@ class Node extends Thread {
 
                 next.receiveToken(this);
 
+                // Stop processing queue, as we forwarded the token
                 return;
             }
         }
     }
 
     private void enterCS() {
-        // Try acquiring the shared critical section lock
-        // If this fails, it means another node is already inside CS,
-        // which indicates a mutual exclusion violation
+        // This lock simulates actual shared resource access
+        // Only one node should EVER successfully acquire it
+        // If tryLock() fails, Raymond's algorithm violated mutual exclusion
         if (!csLock.tryLock()) {
             System.out.println("Mutual exclusion VIOLATED while trying to acquire lock for node " + nodeId + "!");
             return;
@@ -162,21 +191,30 @@ class Node extends Thread {
 
         try {
             System.out.println(">>> Node " + nodeId + " ENTERING CS");
+
+            // Simulate work inside CS
             Thread.sleep(1000);
+
             System.out.println("<<< Node " + nodeId + " EXITING CS");
+
             printSystemState(Main.tree,
                     "STATE AFTER NODE " + nodeId + " COMPLETED CS");
         } catch (InterruptedException e) {
+
             // Clear interrupted flag, allowing this thread to run again
             Thread.currentThread().interrupt();
             System.err.println("Error: Node " + nodeId + " interrupted during execution.");
         } finally {
+
             // Always release the CS lock after execution
-            // finally ensures unlock happens even if an exception occurs
+            // even if an exception occurs
             csLock.unlock();
         }
     }
 
+    // A thread starts executing from run() function
+    // It is assumed that only CS requester threads will be started,
+    // and will immediately request CS, rest will stay idle
     @Override
     public void run() {
 
@@ -184,6 +222,7 @@ class Node extends Thread {
 
         receiveRequest(this);
     }
+
 
     static void printTreeState(Node[] tree) {
         System.out.println("\nParent Structure:");
@@ -230,6 +269,12 @@ class Node extends Thread {
         printRequestQueues(tree);
 
         System.out.println("=================================\n");
+    }
+
+    // In Raymond's algorithm, token holder is represented as root of tree
+    // Root node has no parent
+    boolean hasToken() {
+        return parent == null;
     }
 
     int getParentId() {
