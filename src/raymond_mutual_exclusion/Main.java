@@ -234,17 +234,18 @@ class Node extends Thread {
     }
 
     static void printTokenHolder(Node[] tree) {
-        System.out.println("\nCurrent Token Holder:");
+        System.out.print("\nCurrent Token Holder: ");
 
         for (Node node : tree) {
             if (node.hasToken()) {
-                System.out.println("Node " + node.nodeId + " holds TOKEN");
+                System.out.println(node.nodeId);
                 return;
             }
         }
 
-        System.out.println("No token holder found.");
+        System.out.println("None");
     }
+
 
     static void printRequestQueues(Node[] tree) {
         System.out.println("\nRequest Queues:");

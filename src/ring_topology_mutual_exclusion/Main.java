@@ -222,12 +222,16 @@ class Node extends Thread {
 
 
     static void printTokenHolder(Node[] ring) {
+        System.out.print("\nCurrent Token Holder: ");
+
         for (Node node : ring) {
             if (node.hasToken) {
-                System.out.println("\nCurrent Token Holder: Node " + node.nodeId);
+                System.out.println(node.nodeId);
                 return;
             }
         }
+        
+        System.out.println("None");
     }
 
     static void printPholdRequestQueue(Node[] ring) {
