@@ -18,6 +18,11 @@ class Node extends Thread {
     // may occur, duplicate REQUEST forwarding may happen
     private final ReentrantLock lock = new ReentrantLock();
 
+    // Global lock representing the actual shared resource / critical section
+    // If this algorithm works correctly, only one thread should ever
+    // acquire this lock at a time
+    static final ReentrantLock csLock = new ReentrantLock();
+
     // Prevents duplicate REQUEST forwarding
     private boolean requestSentToParent = false;
 
@@ -134,19 +139,28 @@ class Node extends Thread {
     }
 
     private void enterCS() {
-        System.out.println(">>> Node " + nodeId + " ENTERING CS");
+        // Try acquiring the shared critical section lock
+        // If this fails, it means another node is already inside CS,
+        // which indicates a mutual exclusion violation
+        if (!csLock.tryLock()) {
+            System.out.println("Mutual exclusion VIOLATED while trying to acquire lock for node " + nodeId + "!");
+            return;
+        }
 
         try {
+            System.out.println(">>> Node " + nodeId + " ENTERING CS");
             Thread.sleep(1000);
+            System.out.println("<<< Node " + nodeId + " EXITING CS");
+            printSystemState(Main.tree,
+                    "STATE AFTER NODE " + nodeId + " COMPLETED CS");
         } catch (InterruptedException e) {
             System.err.println("Error: Node " + nodeId + " interrupted during execution.");
             System.exit(1);
+        } finally {
+            // Always release the CS lock after execution
+            // finally ensures unlock happens even if an exception occurs
+            csLock.unlock();
         }
-
-        System.out.println("<<< Node " + nodeId + " EXITING CS");
-
-        printSystemState(Main.tree,
-                "STATE AFTER NODE " + nodeId + " COMPLETED CS");
     }
 
     @Override
