@@ -23,6 +23,11 @@ class Node extends Thread {
     // acquire this lock at a time
     static final ReentrantLock csLock = new ReentrantLock();
 
+    // Lets other nodes or itself know if it's currently in CS
+    // This is required to prevent concurrent actions such as token
+    // passing while being in CS
+    private boolean inCS = false;
+
     // Prevents duplicate REQUEST forwarding
     private boolean requestSentToParent = false;
 
@@ -94,7 +99,7 @@ class Node extends Thread {
             // By locking, we safely insert to the queue and modify state variables
             lock.lock();
             try {
-                if (!hasToken || requestQueue.isEmpty()) {
+                if (inCS || !hasToken || requestQueue.isEmpty()) {
                     return;
                 }
 
@@ -109,6 +114,8 @@ class Node extends Thread {
                         requestSentToParent = true;
                         forwardRequestTo = next;
                     }
+                } else {
+                    inCS = true;
                 }
 
             } finally {
@@ -116,8 +123,15 @@ class Node extends Thread {
                 lock.unlock();
             }
 
-            if (next == this) {
+            if (inCS) {
                 enterCS();
+
+                lock.lock();
+                try {
+                    inCS = false;
+                } finally {
+                    lock.unlock();
+                }
             } else {
                 // Forward request outside lock to avoid deadlock, recieveRequest() can
                 // handle locking on its own
