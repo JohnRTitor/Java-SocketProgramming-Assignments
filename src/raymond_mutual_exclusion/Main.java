@@ -147,7 +147,7 @@ class Node extends Thread {
                 lock.unlock();
             }
 
-            if (next == this) {
+            if (inCS) {
                 enterCS();
 
                 // Reset CS state after CS execution is completed

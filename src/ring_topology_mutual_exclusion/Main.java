@@ -44,10 +44,6 @@ class Node extends Thread {
         this.hasToken = true;
     }
 
-    boolean hasToken() {
-        return hasToken;
-    }
-
     // Called when this node receives a token request <TR, requesterId>.
     // If this node is Phold (hasToken == true) it enqueues the requesterId and
     // will serve it (even if currently in CS — processQueue fires after CS exits).
@@ -76,8 +72,8 @@ class Node extends Thread {
         }
 
         if (forwardTo != null) {
-            System.out.println("Node " + nodeId
-                    + " forwarding <TR, " + requesterId + "> to Node " + forwardTo.nodeId);
+//            System.out.println("Node " + nodeId
+//                    + " forwarding <TR, " + requesterId + "> to Node " + forwardTo.nodeId);
             forwardTo.receiveRequest(requesterId);
         }
 
@@ -115,8 +111,8 @@ class Node extends Thread {
         }
 
         if (forwardTo != null) {
-            System.out.println("Node " + nodeId
-                    + " forwarding <TKN, " + targetId + ", " + q + "> to Node " + forwardTo.nodeId);
+//            System.out.println("Node " + nodeId
+//                    + " forwarding <TKN, " + targetId + ", " + q + "> to Node " + forwardTo.nodeId);
             forwardTo.receiveToken(targetId, q);
         }
 
@@ -161,7 +157,7 @@ class Node extends Thread {
                 lock.unlock();
             }
 
-            if (next == nodeId) {
+            if (inCS) {
                 enterCS();
 
                 lock.lock();
@@ -189,8 +185,8 @@ class Node extends Thread {
                     lock.unlock();
                 }
 
-                printSystemState(Main.ring,
-                        "STATE BEFORE PASSING TOKEN TO Node " + next);
+//                printSystemState(Main.ring,
+//                        "STATE BEFORE PASSING TOKEN TO Node " + next);
 
                 System.out.println("Node " + nodeId
                         + " passing <TKN, " + next + ", " + remainingQueue + "> to Node "
@@ -246,22 +242,11 @@ class Node extends Thread {
         nextNeighbor.receiveRequest(nodeId);
     }
 
-    // -------------------------------------------------------------------------
-    // Diagnostic helpers
-    // -------------------------------------------------------------------------
-
-    static void printRingState(Node[] ring) {
-        System.out.println("\nRing Neighbor Structure:");
-        for (Node node : ring) {
-            System.out.println("Node " + node.nodeId
-                    + " -> next: Node " + node.nextNeighbor.nodeId);
-        }
-    }
 
     static void printTokenHolder(Node[] ring) {
         System.out.println("\nCurrent Token Holder:");
         for (Node node : ring) {
-            if (node.hasToken()) {
+            if (node.hasToken) {
                 System.out.println("Node " + node.nodeId + " holds TOKEN");
                 return;
             }
@@ -272,7 +257,7 @@ class Node extends Thread {
     static void printRequestQueues(Node[] ring) {
         System.out.println("\nRequest Queue (at Phold):");
         for (Node node : ring) {
-            if (node.hasToken()) {
+            if (node.hasToken) {
                 System.out.println("Node " + node.nodeId + " queue -> " + node.getQueueString());
                 return;
             }
@@ -284,7 +269,6 @@ class Node extends Thread {
         System.out.println("\n=================================");
         System.out.println(stage);
         System.out.println("=================================");
-        printRingState(ring);
         printTokenHolder(ring);
         printRequestQueues(ring);
         System.out.println("=================================\n");
@@ -298,10 +282,27 @@ class Node extends Thread {
             lock.unlock();
         }
     }
+
+    int getNodeId() {
+        return nodeId;
+    }
+
+    Node getNextNeighbor() {
+        return nextNeighbor;
+    }
 }
 
 class Main {
     static Node[] ring;
+
+    static void printRingState() {
+        System.out.println("Ring Neighbor Structure:");
+        for (Node node : ring) {
+            System.out.println("Node " + node.getNodeId()
+                    + " -> next: Node " + node.getNextNeighbor().getNodeId());
+        }
+        System.out.println("=================================");
+    }
 
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
@@ -357,6 +358,7 @@ class Main {
         }
 
         Node.printSystemState(ring, "INITIAL STATE");
+        printRingState();
 
         // Start all requesting nodes concurrently
         for (int id : requestors) {
