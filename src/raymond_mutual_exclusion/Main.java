@@ -7,9 +7,6 @@ class Node extends Thread {
     private final int nodeId;
     private Node parent = null;
 
-    // True only for current token holder
-    private boolean hasToken = false;
-
     // Protects queue + token state from concurrent access
     // As multiple threads may simultaneously call receiveRequest(),
     // receiveToken(), processQueue(), and these methods modify
@@ -43,8 +40,11 @@ class Node extends Thread {
     }
 
     void setAsRoot() {
-        this.hasToken = true;
         this.parent = null;
+    }
+
+    boolean hasToken() {
+        return parent == null;
     }
 
     void receiveRequest(Node requester) {
@@ -56,7 +56,7 @@ class Node extends Thread {
         try {
             requestQueue.add(requester);
 
-            if (!hasToken && !requestSentToParent) {
+            if (!hasToken() && !requestSentToParent) {
                 requestSentToParent = true;
                 forwardTo = parent;
             }
@@ -99,7 +99,7 @@ class Node extends Thread {
             // By locking, we safely insert to the queue and modify state variables
             lock.lock();
             try {
-                if (inCS || !hasToken || requestQueue.isEmpty()) {
+                if (inCS || !hasToken() || requestQueue.isEmpty()) {
                     return;
                 }
 
@@ -107,7 +107,6 @@ class Node extends Thread {
                 next = requestQueue.poll();
 
                 if (next != this) {
-                    hasToken = false;
                     parent = next;
 
                     if (!requestQueue.isEmpty()) {
@@ -123,7 +122,7 @@ class Node extends Thread {
                 lock.unlock();
             }
 
-            if (inCS) {
+            if (next == this) {
                 enterCS();
 
                 lock.lock();
@@ -202,7 +201,7 @@ class Node extends Thread {
         System.out.println("\nCurrent Token Holder:");
 
         for (Node node : tree) {
-            if (node.hasToken) {
+            if (node.hasToken()) {
                 System.out.println("Node " + node.nodeId + " holds TOKEN");
                 return;
             }
@@ -283,7 +282,7 @@ class Main {
         // Don't allow multiple roots or no root, this must be equal to 1 after all input
         int rootCount = 0;
 
-        System.out.println("Enter parent id for each node (-1 for root/token holder):");
+        System.out.println("Enter parent id for each node (-1 for root, which holds token initially):");
 
         for (int i = 0; i < n; i++) {
 
