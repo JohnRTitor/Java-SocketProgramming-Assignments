@@ -50,7 +50,7 @@ class Node extends Thread {
     // around the ring toward Phold. Every TR is guaranteed to terminate
     // at Phold within at most N-1 hops.
     void receiveRequest(int requesterId) {
-        // Walk the ring until we land on Phold
+        // Traverse the ring until we reach Phold
         Node current = this;
         while (true) {
             current.lock.lock();
@@ -85,7 +85,7 @@ class Node extends Thread {
                     // This node is the intended new Phold
                     current.hasToken = true;
 
-                    // Absorb the queue that travels with the token
+                    // Add all elements of the queue that travels with the token
                     current.requestQueue.addAll(q);
                     System.out.println("Node " + current.nodeId
                             + " received TOKEN <TKN, " + targetId + ", " + q
@@ -106,7 +106,7 @@ class Node extends Thread {
 
     // Phold processes the request queue after entering/exiting CS or receiving the token.
     // Keeps serving the next requester until the queue is empty, the token is passed,
-    // or this node enters CS.
+    // or this node enters CS
     void processQueue() {
         while (true) {
             int next = -1;
@@ -230,7 +230,7 @@ class Node extends Thread {
                 return;
             }
         }
-        
+
         System.out.println("None");
     }
 
