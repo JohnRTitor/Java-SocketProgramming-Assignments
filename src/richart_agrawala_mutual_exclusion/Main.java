@@ -91,7 +91,7 @@ class Node extends Thread {
                 // Defer: we will send GO_AHEAD after we leave CS
                 deferredList.add(requester);
                 System.out.println("Node " + nodeId +
-                        " will send GO_AHEAD to Node " + requester.nodeId + " later (");
+                        " will send GO_AHEAD to Node " + requester.nodeId + " later");
                 sendGoAheadNow = false;
             } else {
                 sendGoAheadNow = true;
