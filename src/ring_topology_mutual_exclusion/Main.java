@@ -92,8 +92,9 @@ class Node extends Thread {
                             + "> — now Phold");
                     break;
                 } else {
-//                    System.out.println("Node " + nodeId
-//                            + " forwarding <TKN, " + targetId + ", " + q + "> to Node " + current.nextNeighbor.nodeId);
+                    System.out.println("Node " + current.nodeId
+                            + " forwarding <TKN, " + targetId + ", " + q + "> to Node "
+                            + current.nextNeighbor.nodeId);
                 }
             } finally {
                 current.lock.unlock();
