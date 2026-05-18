@@ -339,9 +339,22 @@ class Main {
         Node.printSystemState(ring, "INITIAL STATE");
         printRingState();
 
-        // Start all requesting nodes concurrently
-        for (int id : requestors) {
-            ring[id].start();
+        // Start all requesting nodes concurrently except last node
+        for (int i = 0; i < requestors.size(); i++) {
+            if (i == requestors.size() - 1) {
+                try {
+                    // Delay the last node to ensure all other nodes have started and
+                    // requested CS already. The last node will request CS after 5 seconds
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+
+                    // Clear interrupted flag, allowing this thread to run again
+                    Thread.currentThread().interrupt();
+                    System.err.println("Error: Main thread interrupted.");
+                }
+            }
+
+            ring[requestors.get(i)].start();
         }
 
         // Wait for all CS requester threads to finish
