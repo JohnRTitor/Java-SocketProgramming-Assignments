@@ -25,7 +25,7 @@ class Node {
 
     @Override
     public String toString() {
-        return "Node " + id + " -> public(u): " + u + "  private(v): " + v;
+        return "Node " + id + " : " + u + " (public) " + v + " (private)";
     }
 }
 
@@ -64,10 +64,9 @@ class Main {
         while (true) {
 
             System.out.println("\n=================================");
-            System.out.println("Dynamic request section");
-            System.out.println("=================================");
-            System.out.println("\n1. Add dependency edge");
-            System.out.println("2. Add new node");
+            System.out.println("Options: ");
+            System.out.println("\n1. Add process dependency");
+            System.out.println("2. Add a new process");
             System.out.println("3. Exit");
             System.out.print("\nEnter choice: ");
 
@@ -123,7 +122,7 @@ class Main {
     private static void addNewEdge() {
 
         System.out.println("\n=================================");
-        System.out.println("Add dependency edge");
+        System.out.println("Add process dependency");
         System.out.println("=================================");
 
         // blocked = process waiting
@@ -156,7 +155,7 @@ class Main {
     private static void addNewNode() {
 
         System.out.println("\n=================================");
-        System.out.println("Add new node");
+        System.out.println("Add a new process");
         System.out.println("=================================");
 
         // New node id is equal to current node count
@@ -199,7 +198,7 @@ class Main {
     private static void applyBlockRule(int blockedId, int blockingId) {
 
         System.out.println("\n=================================");
-        System.out.println("Block rule execution");
+        System.out.println("Applying block rule");
         System.out.println("=================================");
 
         // Get both nodes involved in dependency
@@ -212,24 +211,15 @@ class Main {
         System.out.println("  blocked  -> " + blocked);
         System.out.println("  blocking -> " + blocking);
 
-        // Apply block rule only if blocked.u is smaller
-        if (blocked.u < blocking.u) {
+        // Generate next label value
+        int k = Math.max(blocked.u, blocking.u) + 1;
 
-            // Generate next label value
-            int k = Math.max(blocked.u, blocking.u) + 1;
+        // Update both public and private labels
+        blocked.u = k;
+        blocked.v = k;
 
-            // Update both public and private labels
-            blocked.u = k;
-            blocked.v = k;
-
-            System.out.println("\nAfter block rule:");
-            System.out.println("  updated  -> " + blocked);
-
-        } else {
-
-            // No update needed
-            System.out.println("\nNo update required (blocked.u >= blocking.u).");
-        }
+        System.out.println("\nAfter block rule:");
+        System.out.println("  updated  -> " + blocked);
 
         printAllStates("STATE AFTER BLOCK RULE");
     }
@@ -241,7 +231,7 @@ class Main {
     private static void applyTransmitRule() {
 
         System.out.println("\n=================================");
-        System.out.println("Transmit rule execution");
+        System.out.println("Applying transmit rule");
         System.out.println("=================================");
 
         // Tracks whether any update happened in current iteration
@@ -251,8 +241,7 @@ class Main {
         boolean changedAtLeastOnce = false;
 
         // Continue until no more propagation occurs
-        do {
-
+        while (true) {
             changedThisPass = false;
 
             // Traverse adjacency matrix
@@ -291,7 +280,8 @@ class Main {
                 }
             }
 
-        } while (changedThisPass);
+            if (!changedThisPass) break;
+        }
 
         // No propagation occurred
         if (!changedAtLeastOnce)
@@ -347,9 +337,6 @@ class Main {
 
                     detected = true;
 
-                } else {
-
-                    System.out.println("  No deadlock on this edge.");
                 }
             }
         }
