@@ -1,4 +1,4 @@
-package mitchell_merritt_algorithm;
+package mitchell_merritt_deadlock_detection;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +26,32 @@ class Node {
     @Override
     public String toString() {
         return "Node " + id + " : " + u + " (public) " + v + " (private)";
+    }
+}
+
+class DependencyRequest extends Thread {
+
+    // The blocked node id (waiting process)
+    private final int blockedId;
+
+    // The blocking node id (process being waited on)
+    private final int blockingId;
+
+    DependencyRequest(int blockedId, int blockingId) {
+        this.blockedId = blockedId;
+        this.blockingId = blockingId;
+    }
+
+    @Override
+    public void run() {
+
+        System.out.println("\n[" + getName() + "] "
+            + "processing...");
+
+        // Apply Mitchell-Merritt rules in order
+        Main.applyBlockRule(blockedId, blockingId);
+        Main.applyTransmitRule();
+        Main.detectDeadlock();
     }
 }
 
@@ -125,31 +151,38 @@ class Main {
         System.out.println("Add process dependency");
         System.out.println("=================================");
 
-        // blocked = process waiting
-        // blocking = process being waited on
-        System.out.print("Enter blocked and blocking process ids: ");
+        // blockedId = process waiting
+        // blockingId = process being waited on
+        System.out.print("Enter blockedId and blockingId process ids: ");
 
-        int blocked = sc.nextInt();
-        int blocking = sc.nextInt();
+        int blockedId = sc.nextInt();
+        int blockingId = sc.nextInt();
 
         // Validate node ids
-        if (isInvalidId(blocked) || isInvalidId(blocking)) {
+        if (isInvalidId(blockedId) || isInvalidId(blockingId)) {
             System.out.println("\nInvalid node id.");
             return;
         }
 
         // Create dependency edge
-        adjMatrix[blocked][blocking] = 1;
+        adjMatrix[blockedId][blockingId] = 1;
 
-        System.out.println("\nNew edge added: Node " + blocked + " -> Node " + blocking);
+        System.out.println("\nNew edge added: Node " + blockedId + " -> Node " + blockingId);
 
         // Show updated dependency matrix
         printMatrix();
 
-        // Apply Mitchell-Merritt rules in order
-        applyBlockRule(blocked, blocking);
-        applyTransmitRule();
-        detectDeadlock();
+        DependencyRequest request = new DependencyRequest(blockedId, blockingId);
+        request.setName("DependencyRequest thread: " + blockedId + "-" + blockingId);
+        request.start();
+
+        // Wait for request thread to finish
+        try {
+            request.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.err.println("Error: " + request.getName() + " interrupted.");
+        }
     }
 
     private static void addNewNode() {
@@ -195,7 +228,7 @@ class Main {
     //  Block rule
     //  If blocked.u < blocking.u, set blocked.u = blocked.v
     //                                  = max(blocked.u, blocking.u) + 1
-    private static void applyBlockRule(int blockedId, int blockingId) {
+    public static void applyBlockRule(int blockedId, int blockingId) {
 
         System.out.println("\n=================================");
         System.out.println("Applying block rule");
@@ -228,7 +261,7 @@ class Main {
     //  For every edge i -> j, if blocking.u > blocked.u,
     //  propagate blocking's public label back to blocked (opposite dir).
     //  Repeat until no change occurs.
-    private static void applyTransmitRule() {
+    public static void applyTransmitRule() {
 
         System.out.println("\n=================================");
         System.out.println("Applying transmit rule");
@@ -291,7 +324,7 @@ class Main {
     //  Detection rule                                                      //
     //  For every edge i -> j, deadlock exists if:                         //
     //      blocked.u == blocked.v  AND  blocked.u == blocking.u           //
-    private static void detectDeadlock() {
+    public static void detectDeadlock() {
 
         System.out.println("\n=================================");
         System.out.println("Deadlock detection");
