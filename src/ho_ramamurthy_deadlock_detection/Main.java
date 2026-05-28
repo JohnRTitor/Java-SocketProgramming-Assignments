@@ -185,11 +185,11 @@ class Main {
 
         inputProcessStatusTable();
         inputResourceStatusTable();
-
-        for (Site site : sites) {
+        
+        sites.forEach(site -> {
             site.printProcessStatusTable();
             site.printResourceStatusTable();
-        }
+        });
 
         buildWaitForGraph();
         printWaitForGraph();
@@ -231,8 +231,8 @@ class Main {
         System.out.println("\nNow, enter which processes are blocked on which resources.");
         System.out.println("Enter -1 if the process is not blocked on any resource.");
 
-        for (Process currentProcess : allProcesses) {
-            System.out.print("Process " + currentProcess.processId + " : ");
+        allProcesses.forEach(p -> {
+            System.out.print("Process " + p.processId + " : ");
 
             int resourceId;
             while (true) {
@@ -244,17 +244,17 @@ class Main {
                     continue;
                 }
 
-                currentProcess.site.processStatusTable.get(currentProcess.processId).add(resourceId);
+                p.site.processStatusTable.get(p.processId).add(resourceId);
             }
-        }
+        });
     }
 
     static void inputResourceStatusTable() {
         System.out.println("\nNow, enter which resources are allocated to which processes.");
         System.out.println("Enter -1 if the resource is not allocated to any process.");
 
-        for (Resource currentResource : allResources) {
-            System.out.print("Resource " + currentResource.resourceId + " : ");
+        allResources.forEach(r -> {
+            System.out.print("Resource " + r.resourceId + " : ");
 
             int processId;
             while (true) {
@@ -266,9 +266,9 @@ class Main {
                     continue;
                 }
 
-                currentResource.site.resourceStatusTable.get(currentResource.resourceId).add(processId);
+                r.site.resourceStatusTable.get(r.resourceId).add(processId);
             }
-        }
+        });
     }
 
     static void buildWaitForGraph() {
