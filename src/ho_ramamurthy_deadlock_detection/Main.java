@@ -3,7 +3,10 @@ package ho_ramamurthy_deadlock_detection;
 import java.util.*;
 
 class Process extends Thread {
+    // Unique identifier assigned globally to each process
     int processId;
+
+    // Site where this process is located
     Site site;
 
     Process(int processId, Site site) {
@@ -18,7 +21,10 @@ class Process extends Thread {
 }
 
 class Resource {
+    // Unique identifier assigned globally to each resource
     final int resourceId;
+
+    // Site where this resource is located
     final Site site;
 
     Resource(int resourceId, Site site) {
@@ -33,15 +39,22 @@ class Resource {
 }
 
 class Site {
+    // Unique identifier for this site in the distributed system
     final int siteId;
 
+    // Processes and resources that belong to this site
     Map<Integer, Process> processes = new HashMap<>();
     Map<Integer, Resource> resources = new HashMap<>();
 
-    // Pid -> blocked resource ids
+    // Process Status Table:
+    // key   -> process id
+    // value -> resource ids for which the process is currently blocked
     Map<Integer, Set<Integer>> processStatusTable = new HashMap<>();
 
-    // Rid -> allocated process ids, here only 1 process can be allocated to a resource
+    // Resource Status Table:
+    // key   -> resource id
+    // value -> process ids currently holding that resource
+    // Here a resource is expected to be allocated to at most one process
     Map<Integer, Set<Integer>> resourceStatusTable = new HashMap<>();
 
     Site(int siteId) {
@@ -181,11 +194,8 @@ class Main {
         buildWaitForGraph();
         printWaitForGraph();
 
-        if (detectDeadlock()) {
-            System.out.println("Deadlock detected.");
-        } else {
-            System.out.println("No deadlock detected.");
-        }
+        if (detectDeadlock()) System.out.println("Deadlock detected.");
+        else System.out.println("No deadlock detected.");
     }
 
     static void inputSiteProcessResourceCount() {
@@ -227,9 +237,7 @@ class Main {
             int resourceId;
             while (true) {
                 resourceId = sc.nextInt();
-                if (resourceId == -1) {
-                    break;
-                }
+                if (resourceId == -1) break;
 
                 if (!isValidResourceId(resourceId)) {
                     System.out.println("Invalid resource id: " + resourceId + ". Try again.");
@@ -251,9 +259,7 @@ class Main {
             int processId;
             while (true) {
                 processId = sc.nextInt();
-                if (processId == -1) {
-                    break;
-                }
+                if (processId == -1) break;
 
                 if (!isValidProcessId(processId)) {
                     System.out.println("Invalid process id: " + processId + ". Try again.");
@@ -267,9 +273,7 @@ class Main {
 
     static void buildWaitForGraph() {
         // initialize empty adjacency list
-        allProcesses.forEach(p -> {
-            waitForGraph.put(p.processId, new LinkedHashSet<>());
-        });
+        allProcesses.forEach(p -> waitForGraph.put(p.processId, new LinkedHashSet<>()));
 
         // Construct WFG
         allProcesses.forEach(p -> {
