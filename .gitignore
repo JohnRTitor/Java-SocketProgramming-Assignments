@@ -28,3 +28,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# Assignment Files
+*.zip
+*.png
+*.jpg
+*.jpeg
+*.webp
