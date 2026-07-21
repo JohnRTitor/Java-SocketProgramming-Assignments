@@ -6,7 +6,7 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 class Process extends Thread {
-    private final int processId;
+    private final int pid;
 
     // Set of processes this process is waiting for
     private final Set<Process> waitsFor = new HashSet<>();
@@ -19,7 +19,7 @@ class Process extends Thread {
     private final ReentrantLock lock = new ReentrantLock();
 
     Process(int nodeId) {
-        this.processId = nodeId;
+        this.pid = nodeId;
     }
 
     // Add an edge to the wait-for graph
@@ -30,14 +30,14 @@ class Process extends Thread {
     // Receives a probe (initiator, sender, receiver)
     // If the probe reaches the initiator again, deadlock has occurred
     void receiveRequest(Process initiator, Process sender) {
-        System.out.println("[PROBE] P#" + initiator.processId + ", P#"
-            + sender.processId + ", P#" + this.processId
+        System.out.println("[PROBE] P#" + initiator.pid + ", P#"
+            + sender.pid + ", P#" + this.pid
         );
 
         // We reached initiator, deadlock detected
         if (this == initiator) {
             Main.deadlockFound = true;
-            System.out.println("[STOP] Deadlock detected. Sender P#" + sender.processId + ", Receiver P#" + this.processId);
+            System.out.println("[STOP] Deadlock detected. Sender P#" + sender.pid + ", Receiver P#" + this.pid);
             return;
         }
 
@@ -46,7 +46,7 @@ class Process extends Thread {
 
             // Ignore duplicate probes from other paths
             if (alreadyReceivedRequest) {
-                System.out.println("[NON ENGAGING] Non engaging request from P#" + sender.processId);
+                System.out.println("[NON ENGAGING] Non engaging request from P#" + sender.pid);
                 return;
             }
 
@@ -63,7 +63,7 @@ class Process extends Thread {
     }
 
     public void run() {
-        System.out.println("\n[INITIATE] P#" + processId + " sending initial probes");
+        System.out.println("\n[INITIATE] P#" + pid + " sending initial probes");
 
         for (Process p : waitsFor) {
             p.receiveRequest(this, this);
@@ -96,7 +96,7 @@ class Main {
         // Construct the wait for graph
         System.out.println("Enter blocking processes for each processes: ");
         System.out.println("Terminate each list with -1.");
-        
+
         for (int i = 0; i < n; i++) {
             System.out.print(i + ": ");
 
